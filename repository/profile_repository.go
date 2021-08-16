@@ -1,15 +1,30 @@
-package profileapi
+package repository
 
 import (
+	"database/sql"
 	"golangapi/database"
-	"golangapi/entities"
+	"golangapi/model"
+	"golangapi/view"
+	"strconv"
+
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func GetAllProfiles(c *gin.Context) {
+func GetProfile(c *gin.Context) {
+	db := database.DBConn()
+	id := c.Param("id")
+	pfl := getProfile(db, id)
+	c.JSON(200, gin.H{
+		"messages": "GetProfile",
+		"data":     pfl,
+	})
+	defer db.Close()
+}
+
+func GetProfiles(c *gin.Context) {
 	db := database.DBConn()
 	query := "SELECT * FROM profiles"
 	rows, err := db.Query(query)
@@ -18,11 +33,11 @@ func GetAllProfiles(c *gin.Context) {
 			"messages": "Profiles Not Found",
 		})
 	}
-	defer rows.Close() // Hoan lai row Close cho den khi func GetList thuc hien xong
-	var profiles []entities.Profile
+
+	var profiles []view.Profile
 
 	for rows.Next() {
-		var pfl entities.Profile
+		var pfl view.Profile
 		if err := rows.Scan(
 			&pfl.ID,
 			&pfl.Employee_id,
@@ -56,9 +71,9 @@ func GetAllProfiles(c *gin.Context) {
 	defer db.Close()
 }
 
-func AddProfile(c *gin.Context) {
+func CreateProfile(c *gin.Context) {
 	db := database.DBConn()
-	var json entities.CRUDProfile
+	var json model.ProfileRequest
 
 	if err := c.ShouldBindJSON(&json); err == nil {
 		query := `	INSERT INTO profiles(
@@ -89,7 +104,7 @@ func AddProfile(c *gin.Context) {
 			})
 		}
 
-		insProfile.Exec(
+		rs, err := insProfile.Exec(
 			json.Employee_id,
 			json.Name,
 			json.Email,
@@ -110,9 +125,27 @@ func AddProfile(c *gin.Context) {
 			json.Updated_time,
 			json.Updated_user,
 		)
+		if err != nil {
+			c.JSON(500, gin.H{
+				"messages": err,
+			})
+		}
+
+		//Return data profile
+		lastRowId, err := rs.LastInsertId()
+		if err != nil {
+			c.JSON(500, gin.H{
+				"messages": err,
+			})
+		}
+
+		id := strconv.FormatInt(lastRowId, 10)
+
+		pfl := getProfile(db, id)
+
 		c.JSON(200, gin.H{
 			"messages": "Inserted",
-			"json":     insProfile,
+			"data":     pfl,
 		})
 	} else {
 		c.JSON(500, gin.H{
@@ -126,8 +159,8 @@ func AddProfile(c *gin.Context) {
 func UpdateProfile(c *gin.Context) {
 	db := database.DBConn()
 
-	var json entities.CRUDProfile
-
+	var json model.ProfileRequest
+	id := c.Param("id")
 	if err := c.ShouldBindJSON(&json); err == nil {
 		query := `	UPDATE profiles SET
 						employee_id = ?,
@@ -147,7 +180,7 @@ func UpdateProfile(c *gin.Context) {
 						del_flag = ?,
 						updated_time = ?,
 						updated_user = ?
-					WHERE id = ` + c.Param("id")
+					WHERE id = ` + id
 		edit, err := db.Prepare(query)
 		if err != nil {
 			panic(err.Error())
@@ -173,8 +206,12 @@ func UpdateProfile(c *gin.Context) {
 			json.Updated_user,
 		)
 
+		//Return data profile
+		pfl := getProfile(db, id)
+
 		c.JSON(200, gin.H{
 			"messages": "Updated",
+			"data":     pfl,
 		})
 	} else {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -182,7 +219,65 @@ func UpdateProfile(c *gin.Context) {
 	defer db.Close()
 }
 
+func DeleteProfile(c *gin.Context) {
+	db := database.DBConn()
+	id := c.Param("id")
+	query := `	UPDATE profiles SET
+					del_flag = 1
+				WHERE id = ` + id
+
+	delete, err := db.Prepare(query)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	delete.Exec()
+	pfl := getProfile(db, id)
+	c.JSON(200, gin.H{
+		"messages": "Deleted",
+		"data":     pfl,
+	})
+}
+
 func getTime() string {
 	currentTime := time.Now()
 	return currentTime.Format("2006-01-02 15:04:05")
+}
+
+func getProfile(db *sql.DB, id string) view.Profile {
+	//Return data profile
+	query := "SELECT * FROM profiles WHERE id = " + id
+	row, err := db.Query(query)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	var pfl view.Profile
+	for row.Next() {
+		if err := row.Scan(
+			&pfl.ID,
+			&pfl.Employee_id,
+			&pfl.Name,
+			&pfl.Email,
+			&pfl.Birthday,
+			&pfl.Position_id,
+			&pfl.Department_id,
+			&pfl.Status,
+			&pfl.Address,
+			&pfl.Telephone,
+			&pfl.Mobile,
+			&pfl.Official_date,
+			&pfl.Probation_date,
+			&pfl.Gender,
+			&pfl.Image,
+			&pfl.Del_flag,
+			&pfl.Created_time,
+			&pfl.Created_user,
+			&pfl.Updated_time,
+			&pfl.Updated_user,
+		); err != nil {
+			panic(err.Error())
+		}
+	}
+	return pfl
 }
