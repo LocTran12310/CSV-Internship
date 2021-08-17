@@ -1,5 +1,20 @@
 # GolangAPI
 
+### Ngày 17/08/2021
+Code API GET profiles với 2 params: numPage, numRow.
+
+Kết quả trả về:
+```
+{
+    "maxPage":
+    "result": [
+        {},
+        {},
+        ...
+    ]
+}
+```
+
 ### Ngày 16/08/2021
 Tái cấu trúc lại project.
 1. Thao tác với database (select,update,delete) viết trong folder reponsitory -> profile_repository.go => return về data profile dùng model để hứng data

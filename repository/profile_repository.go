@@ -5,9 +5,10 @@ import (
 	"golangapi/database"
 	"golangapi/model"
 	"golangapi/view"
+	"math"
 	"strconv"
+	"strings"
 
-	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -26,15 +27,38 @@ func GetProfile(c *gin.Context) {
 
 func GetProfiles(c *gin.Context) {
 	db := database.DBConn()
-	query := "SELECT * FROM profiles"
+	var profiles []view.Profile
+
+	urlParams := c.Request.URL.Query()
+
+	//Convert []string to string --> string to int
+	numPageString := strings.Join(urlParams["numPage"], "")
+	numRowString := strings.Join(urlParams["numRow"], "")
+
+	// Convert string to int
+	numPageInt, _ := strconv.Atoi(numPageString)
+	numRowInt, _ := strconv.Atoi(numRowString)
+
+	if cReq := checkRequest(numPageString, numRowString, numPageInt, numRowInt); cReq != "" {
+		c.JSON(400, gin.H{
+			"messages": cReq,
+		})
+		return
+	}
+
+	offsetInt := (numPageInt - 1) * numRowInt
+	offsetString := strconv.Itoa(offsetInt)
+	count := countRecords(db, c)
+
+	maxPage := int(math.Ceil(float64(count) / float64(numRowInt)))
+
+	query := "SELECT * FROM profiles LIMIT " + offsetString + ", " + numRowString
 	rows, err := db.Query(query)
 	if err != nil {
 		c.JSON(500, gin.H{
 			"messages": "Profiles Not Found",
 		})
 	}
-
-	var profiles []view.Profile
 
 	for rows.Next() {
 		var pfl view.Profile
@@ -67,7 +91,12 @@ func GetProfiles(c *gin.Context) {
 	if err = rows.Err(); err != nil {
 		panic(err.Error())
 	}
-	c.IndentedJSON(http.StatusOK, profiles)
+
+	c.JSON(200, gin.H{
+		"maxPage": maxPage,
+		"result":  profiles,
+	})
+
 	defer db.Close()
 }
 
@@ -280,4 +309,41 @@ func getProfile(db *sql.DB, id string) view.Profile {
 		}
 	}
 	return pfl
+}
+
+func countRecords(db *sql.DB, c *gin.Context) int {
+	query := "SELECT COUNT(id) FROM profiles"
+	rows, err := db.Query(query)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"messages": err,
+		})
+	}
+
+	defer rows.Close()
+	var count int
+	for rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			c.JSON(500, gin.H{
+				"messages": err,
+			})
+		}
+	}
+	return count
+}
+
+func checkRequest(numPageString string, numRowString string, numPageInt int, numRowInt int) string {
+	if numPageString == "" && numRowString == "" {
+		return "404 Error: Bad Request"
+	}
+	if numPageInt == 0 && numRowInt == 0 {
+		return "numPage, numRow invalid"
+	}
+	if numPageInt == 0 && numRowInt != 0 {
+		return "numPage invalid"
+	}
+	if numPageInt != 0 && numRowInt == 0 {
+		return "numRow invalid"
+	}
+	return ""
 }
