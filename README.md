@@ -1,5 +1,14 @@
 # GolangAPI
 
+### Ngày 19/08/2021
+1. Tạo table Users: https://docs.google.com/spreadsheets/d/18QPaqFgQ9U_CWuVjtc8N00UGKvWLB0ib5_pDlR_8L3o/edit#gid=1251229191Preview
+2. Code API Login.
+3. Update lại các API GET, Add, Update profile sau khi login thành công mới có quyền truy cập.
+4. Note:
+    1. Mã hóa password: Tùy chọn cách mã hóa (https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/09.5.html)
+    1. Quản session: dùng lib github.com/gorilla/sessions đề quản. Quản lý phiên bằng Cookie trả về cho client.
+
+
 ### Ngày 17/08/2021
 Code API GET profiles với 2 params: numPage, numRow.
 
@@ -52,7 +61,9 @@ https://docs.google.com/spreadsheets/d/18QPaqFgQ9U_CWuVjtc8N00UGKvWLB0ib5_pDlR_8
 
 
 <!-- Object mẫu
+//Profile
 {
+    "id": 9,
     "employee_id": "999999",
     "name": "Tran Phuoc Loc",
     "email": "email@mail.com",
@@ -68,5 +79,19 @@ https://docs.google.com/spreadsheets/d/18QPaqFgQ9U_CWuVjtc8N00UGKvWLB0ib5_pDlR_8
     "gender": 1,
     "image": "",
     "del_flag": 0
+}
+
+//User
+{
+    "id": 1,
+    "login_id": "user",
+    "contract_type_id": 1,
+    "profile_id": 10,
+    "password": "123456",
+    "del_flag": 0,
+    "updated_time": "2021-08-18 10:20:49",
+    "updated_user": "123",
+    "created_time": "2021-08-12 10:20:49",
+    "created_user": "123"
 }
 -->
