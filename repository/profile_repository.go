@@ -3,9 +3,12 @@ package repository
 import (
 	"database/sql"
 	"golangapi/database"
+	"golangapi/helper"
 	"golangapi/model"
 	"golangapi/view"
+	"io"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 
@@ -38,73 +41,121 @@ func GetProfiles(c *gin.Context) {
 	// Convert string to int
 	numPageInt, _ := strconv.Atoi(numPageString)
 	numRowInt, _ := strconv.Atoi(numRowString)
-
-	if cReq := checkRequest(numPageString, numRowString, numPageInt, numRowInt); cReq != "" {
-		c.JSON(400, gin.H{
-			"messages": cReq,
-		})
-		return
-	}
-
-	offsetInt := (numPageInt - 1) * numRowInt
-	offsetString := strconv.Itoa(offsetInt)
 	count := countRecords(db, c)
 
 	maxPage := int(math.Ceil(float64(count) / float64(numRowInt)))
 
-	query := "SELECT * FROM profiles LIMIT " + offsetString + ", " + numRowString
-	rows, err := db.Query(query)
-	if err != nil {
-		c.JSON(500, gin.H{
-			"messages": "Profiles Not Found",
-		})
-	}
+	//Check if urlParams empty ==> return All Profiles
+	if cReq := checkRequest(numPageString, numRowString, numPageInt, numRowInt); cReq != "" {
+		query := "SELECT * FROM profiles WHERE del_flag = 0 "
+		rows, err := db.Query(query)
+		if err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
+			c.JSON(500, gin.H{
+				"messages": "Profiles Not Found",
+			})
+		}
+		for rows.Next() {
+			var pfl view.Profile
 
-	for rows.Next() {
-		var pfl view.Profile
-		if err := rows.Scan(
-			&pfl.ID,
-			&pfl.Employee_id,
-			&pfl.Name,
-			&pfl.Email,
-			&pfl.Birthday,
-			&pfl.Position_id,
-			&pfl.Department_id,
-			&pfl.Status,
-			&pfl.Address,
-			&pfl.Telephone,
-			&pfl.Mobile,
-			&pfl.Official_date,
-			&pfl.Probation_date,
-			&pfl.Gender,
-			&pfl.Image,
-			&pfl.Del_flag,
-			&pfl.Created_time,
-			&pfl.Created_user,
-			&pfl.Updated_time,
-			&pfl.Updated_user,
-		); err != nil {
+			if err := rows.Scan(
+				&pfl.ID,
+				&pfl.Employee_id,
+				&pfl.Name,
+				&pfl.Email,
+				&pfl.Birthday,
+				&pfl.Position_id,
+				&pfl.Department_id,
+				&pfl.Status,
+				&pfl.Address,
+				&pfl.Telephone,
+				&pfl.Mobile,
+				&pfl.Official_date,
+				&pfl.Probation_date,
+				&pfl.Gender,
+				&pfl.Image,
+				&pfl.Del_flag,
+				&pfl.Created_time,
+				&pfl.Created_user,
+				&pfl.Updated_time,
+				&pfl.Updated_user,
+			); err != nil {
+				panic(err.Error())
+			}
+			profiles = append(profiles, pfl)
+		}
+		if err = rows.Err(); err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			panic(err.Error())
 		}
-		profiles = append(profiles, pfl)
-	}
-	if err = rows.Err(); err != nil {
-		panic(err.Error())
-	}
 
-	c.JSON(200, gin.H{
-		"maxPage": maxPage,
-		"result":  profiles,
-	})
+		c.JSON(200, gin.H{
+			"maxPage": maxPage,
+			"result":  profiles,
+		})
+	} else {
+		offsetInt := (numPageInt - 1) * numRowInt
+		offsetString := strconv.Itoa(offsetInt)
 
+		query := "SELECT * FROM profiles WHERE del_flag = 0 LIMIT " + offsetString + ", " + numRowString
+		rows, err := db.Query(query)
+		if err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
+			c.JSON(500, gin.H{
+				"messages": "Profiles Not Found",
+			})
+		}
+		for rows.Next() {
+			var pfl view.Profile
+
+			if err := rows.Scan(
+				&pfl.ID,
+				&pfl.Employee_id,
+				&pfl.Name,
+				&pfl.Email,
+				&pfl.Birthday,
+				&pfl.Position_id,
+				&pfl.Department_id,
+				&pfl.Status,
+				&pfl.Address,
+				&pfl.Telephone,
+				&pfl.Mobile,
+				&pfl.Official_date,
+				&pfl.Probation_date,
+				&pfl.Gender,
+				&pfl.Image,
+				&pfl.Del_flag,
+				&pfl.Created_time,
+				&pfl.Created_user,
+				&pfl.Updated_time,
+				&pfl.Updated_user,
+			); err != nil {
+				helper.WriteLog("/profile.log", err.Error(), query)
+				panic(err.Error())
+			}
+			profiles = append(profiles, pfl)
+		}
+		if err = rows.Err(); err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
+			panic(err.Error())
+		}
+
+		c.JSON(200, gin.H{
+			"maxPage": maxPage,
+			"result":  profiles,
+		})
+	}
 	defer db.Close()
 }
 
 func CreateProfile(c *gin.Context) {
 	db := database.DBConn()
 	var json model.ProfileRequest
+	c.Request.ParseMultipartForm(8 << 20)
 
-	if err := c.ShouldBindJSON(&json); err == nil {
+	if err := c.ShouldBind(&json); err == nil {
+		image := imageUpload(c)
+
 		query := `	INSERT INTO profiles(
 						employee_id,
 						name,
@@ -126,10 +177,14 @@ func CreateProfile(c *gin.Context) {
 						updated_time,
 						updated_user
 					) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+
+		//+ " WHERE NOT EXIST (SELECT id FROM profiles WHERE employee_id = '" + json.Employee_id + "')"
 		insProfile, err := db.Prepare(query)
 		if err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"messages": err,
+				"prepare":  "WRONG",
 			})
 		}
 
@@ -147,7 +202,7 @@ func CreateProfile(c *gin.Context) {
 			json.Official_date,
 			json.Probation_date,
 			json.Gender,
-			json.Image,
+			image,
 			json.Del_flag,
 			getTime(),
 			json.Created_user,
@@ -155,16 +210,20 @@ func CreateProfile(c *gin.Context) {
 			json.Updated_user,
 		)
 		if err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"messages": err,
+				"exec":     "WRONG",
 			})
 		}
 
 		//Return data profile
 		lastRowId, err := rs.LastInsertId()
 		if err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"messages": err,
+				"lastID":   "WRONG",
 			})
 		}
 
@@ -177,8 +236,10 @@ func CreateProfile(c *gin.Context) {
 			"data":     pfl,
 		})
 	} else {
+		helper.WriteLog("/profile.log", err.Error(), "")
 		c.JSON(500, gin.H{
 			"error": err.Error(),
+			"err":   "WRONG",
 		})
 	}
 
@@ -187,10 +248,17 @@ func CreateProfile(c *gin.Context) {
 
 func UpdateProfile(c *gin.Context) {
 	db := database.DBConn()
+	c.Request.ParseMultipartForm(8 << 20)
 
 	var json model.ProfileRequest
 	id := c.Param("id")
-	if err := c.ShouldBindJSON(&json); err == nil {
+	if err := c.ShouldBind(&json); err == nil {
+		image := imageUpload(c)
+		pflCheck := getProfile(db, id)
+		if pflCheck.Image != "" && image == "" {
+			image = pflCheck.Image
+		}
+
 		query := `	UPDATE profiles SET
 						employee_id = ?,
 						name = ?,
@@ -212,6 +280,7 @@ func UpdateProfile(c *gin.Context) {
 					WHERE id = ` + id
 		edit, err := db.Prepare(query)
 		if err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			panic(err.Error())
 		}
 
@@ -229,12 +298,11 @@ func UpdateProfile(c *gin.Context) {
 			json.Official_date,
 			json.Probation_date,
 			json.Gender,
-			json.Image,
+			image,
 			json.Del_flag,
 			getTime(),
 			json.Updated_user,
 		)
-
 		//Return data profile
 		pfl := getProfile(db, id)
 
@@ -243,6 +311,7 @@ func UpdateProfile(c *gin.Context) {
 			"data":     pfl,
 		})
 	} else {
+		helper.WriteLog("/profile.log", err.Error(), "")
 		c.JSON(500, gin.H{"error": err.Error()})
 	}
 	defer db.Close()
@@ -257,14 +326,13 @@ func DeleteProfile(c *gin.Context) {
 
 	delete, err := db.Prepare(query)
 	if err != nil {
+		helper.WriteLog("/profile.log", err.Error(), query)
 		panic(err.Error())
 	}
 
 	delete.Exec()
-	pfl := getProfile(db, id)
 	c.JSON(200, gin.H{
 		"messages": "Deleted",
-		"data":     pfl,
 	})
 }
 
@@ -275,9 +343,10 @@ func getTime() string {
 
 func getProfile(db *sql.DB, id string) view.Profile {
 	//Return data profile
-	query := "SELECT * FROM profiles WHERE id = " + id
+	query := "SELECT * FROM profiles WHERE id = " + id + " AND del_flag = 0"
 	row, err := db.Query(query)
 	if err != nil {
+		helper.WriteLog("/profile.log", err.Error(), query)
 		panic(err.Error())
 	}
 
@@ -305,6 +374,7 @@ func getProfile(db *sql.DB, id string) view.Profile {
 			&pfl.Updated_time,
 			&pfl.Updated_user,
 		); err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			panic(err.Error())
 		}
 	}
@@ -312,9 +382,10 @@ func getProfile(db *sql.DB, id string) view.Profile {
 }
 
 func countRecords(db *sql.DB, c *gin.Context) int {
-	query := "SELECT COUNT(id) FROM profiles"
+	query := "SELECT COUNT(id) FROM profiles WHERE del_flag = 0"
 	rows, err := db.Query(query)
 	if err != nil {
+		helper.WriteLog("/profile.log", err.Error(), query)
 		c.JSON(500, gin.H{
 			"messages": err,
 		})
@@ -324,6 +395,7 @@ func countRecords(db *sql.DB, c *gin.Context) int {
 	var count int
 	for rows.Next() {
 		if err := rows.Scan(&count); err != nil {
+			helper.WriteLog("/profile.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"messages": err,
 			})
@@ -334,7 +406,7 @@ func countRecords(db *sql.DB, c *gin.Context) int {
 
 func checkRequest(numPageString string, numRowString string, numPageInt int, numRowInt int) string {
 	if numPageString == "" && numRowString == "" {
-		return "404 Error: Bad Request"
+		return "400 Error: Bad Request"
 	}
 	if numPageInt == 0 && numRowInt == 0 {
 		return "numPage, numRow invalid"
@@ -346,4 +418,23 @@ func checkRequest(numPageString string, numRowString string, numPageInt int, num
 		return "numRow invalid"
 	}
 	return ""
+}
+
+func imageUpload(c *gin.Context) string {
+	c.Request.ParseMultipartForm(8 << 20)
+
+	file, handler, err := c.Request.FormFile("imageFile")
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	f, err := os.OpenFile("public/users/"+handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	io.Copy(f, file)
+
+	return handler.Filename
 }

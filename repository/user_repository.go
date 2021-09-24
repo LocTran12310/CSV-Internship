@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"golangapi/database"
+	"golangapi/helper"
 	"golangapi/model"
 	"golangapi/view"
 	"strconv"
@@ -21,6 +22,7 @@ func Login(c *gin.Context) {
 					WHERE login_id = ?`
 		row, err := db.Query(query, json.Login_id)
 		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"messages": err,
 			})
@@ -40,6 +42,7 @@ func Login(c *gin.Context) {
 				&user.Updated_time,
 				&user.Updated_user,
 			); err != nil {
+				helper.WriteLog("/user.log", err.Error(), query)
 				c.JSON(500, gin.H{
 					"messages": "Table User have NULL field",
 				})
@@ -49,6 +52,7 @@ func Login(c *gin.Context) {
 
 		//Check for no results
 		if user.ID == 0 {
+			helper.WriteLog("/user.log", "User Not Found", query)
 			c.JSON(404, gin.H{
 				"messages": "User not found",
 			})
@@ -58,11 +62,14 @@ func Login(c *gin.Context) {
 		// Comparing the password with the hash
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(json.Password)); err != nil {
 			// TODO: Properly handle error
+			helper.WriteLog("/user.log", err.Error(), query)
 			c.JSON(400, gin.H{
 				"messages": "Password is wrong",
 			})
 			return
 		}
+		id := strconv.Itoa(user.Profile_id)
+		pfl := getProfile(db, id)
 
 		session := sessions.Default(c)
 		session.Set("id", user.ID)
@@ -72,6 +79,7 @@ func Login(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"messages":  "Login Successfully",
 			"user":      user,
+			"profile":   pfl,
 			"json.ID":   json.Login_id,
 			"json.Pass": json.Password,
 		})
@@ -107,6 +115,7 @@ func CreateUser(c *gin.Context) {
 					) VALUES(?,?,?,?,?,?,?,?,?)`
 		insUser, err := db.Prepare(query)
 		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"messages": err,
 			})
@@ -115,6 +124,7 @@ func CreateUser(c *gin.Context) {
 		// Generate "hash" to store from user password
 		hash, err := bcrypt.GenerateFromPassword([]byte(json.Password), bcrypt.DefaultCost)
 		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
 			// TODO: Properly handle error
 			panic(err.Error())
 		}
@@ -130,6 +140,8 @@ func CreateUser(c *gin.Context) {
 			json.Updated_user,
 		)
 		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
+
 			c.JSON(500, gin.H{
 				"messages": err,
 			})
@@ -137,6 +149,8 @@ func CreateUser(c *gin.Context) {
 		//Return user
 		lastRowId, err := rs.LastInsertId()
 		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
+
 			c.JSON(500, gin.H{
 				"messages": err,
 			})
@@ -151,6 +165,8 @@ func CreateUser(c *gin.Context) {
 			"data":     user,
 		})
 	} else {
+		helper.WriteLog("/user.log", err.Error(), "")
+
 		c.JSON(500, gin.H{
 			"error": err.Error(),
 		})
@@ -158,12 +174,37 @@ func CreateUser(c *gin.Context) {
 
 	defer db.Close()
 }
+func ChangePassword(c *gin.Context) {
+	db := database.DBConn()
+	var json model.ChangePasswordRequest
+	id := c.Param("id")
+	if err := c.ShouldBindJSON(&json); err == nil {
+		query := `UPDATE users SET password = ? WHERE id = ` + id
+		edit, err := db.Prepare(query)
+		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
+			panic(err.Error())
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(json.Password), bcrypt.DefaultCost)
+		if err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
+			panic(err.Error())
+		}
+		edit.Exec(hash)
+		user := getUser(db, c, id)
+		c.JSON(200, gin.H{
+			"messages": "ChangePassword",
+			"data":     user,
+		})
+	}
+}
 
 func getUser(db *sql.DB, c *gin.Context, id string) view.User {
 	//Return user
 	query := "SELECT * FROM users WHERE id = ?"
 	row, err := db.Query(query, id)
 	if err != nil {
+		helper.WriteLog("/user.log", err.Error(), query)
 		c.JSON(500, gin.H{
 			"error": err,
 		})
@@ -183,6 +224,7 @@ func getUser(db *sql.DB, c *gin.Context, id string) view.User {
 			&user.Updated_time,
 			&user.Updated_user,
 		); err != nil {
+			helper.WriteLog("/user.log", err.Error(), query)
 			c.JSON(500, gin.H{
 				"error": err.Error(),
 			})

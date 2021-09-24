@@ -1,18 +1,24 @@
 # GolangAPI
 
+### Project UI
+
+https://github.com/LocTran12310/VueApp-2.x.git
+
 ### Ngày 19/08/2021
+
 1. Tạo table Users: https://docs.google.com/spreadsheets/d/18QPaqFgQ9U_CWuVjtc8N00UGKvWLB0ib5_pDlR_8L3o/edit#gid=1251229191Preview
 2. Code API Login.
 3. Update lại các API GET, Add, Update profile sau khi login thành công mới có quyền truy cập.
 4. Note:
-    1. Mã hóa password: Tùy chọn cách mã hóa (https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/09.5.html)
-    1. Quản session: dùng lib github.com/gorilla/sessions đề quản. Quản lý phiên bằng Cookie trả về cho client.
-
+   1. Mã hóa password: Tùy chọn cách mã hóa (https://astaxie.gitbooks.io/build-web-application-with-golang/content/en/09.5.html)
+   1. Quản session: dùng lib github.com/gorilla/sessions đề quản. Quản lý phiên bằng Cookie trả về cho client.
 
 ### Ngày 17/08/2021
+
 Code API GET profiles với 2 params: numPage, numRow.
 
 Kết quả trả về:
+
 ```
 {
     "maxPage":
@@ -25,7 +31,9 @@ Kết quả trả về:
 ```
 
 ### Ngày 16/08/2021
+
 Tái cấu trúc lại project.
+
 1. Thao tác với database (select,update,delete) viết trong folder reponsitory -> profile_repository.go => return về data profile dùng model để hứng data
 2. Tạo 1 folder Model viết các file model trên trong đó
 3. Tạo 1 folder View viết các file model return view json trong đó.
@@ -48,6 +56,7 @@ Tái cấu trúc lại project.
 ```
 
 ### Ngày 13/08/2021
+
 link cấu trúc table profiles tạo database bằng mysql (Dùng Xampp)
 https://docs.google.com/spreadsheets/d/18QPaqFgQ9U_CWuVjtc8N00UGKvWLB0ib5_pDlR_8L3o/edit#gid=744585978Preview
 
@@ -56,9 +65,6 @@ https://docs.google.com/spreadsheets/d/18QPaqFgQ9U_CWuVjtc8N00UGKvWLB0ib5_pDlR_8
 - Code API Add profile
 - Code API Update profile
 - Dùng postman để thao tác với API
-
-
-
 
 <!-- Object mẫu
 //Profile

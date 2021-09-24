@@ -16,3 +16,7 @@ type UserRequest struct {
 	Created_time     string `json:"created_time"`
 	Created_user     string `json:"created_user"`
 }
+
+type ChangePasswordRequest struct {
+	Password string `json:"password" binding:"required"`
+}
