@@ -11,6 +11,60 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func GetAllCourseParticipants(c *gin.Context) {
+	db := database.DBConn()
+	var allCourseParticipants []view.CourseParticipants
+	query := `SELECT
+							course_details.id, profiles.name, profiles.employee_id,
+							courses.name, courses.course_type, courses.id, profiles.id, courses.end_date, courses.weekdays, courses.time,
+							course_details.del_flag, course_details.updated_time,
+							course_details.updated_user, course_details.created_time, course_details.created_user
+						FROM course_details, profiles, courses
+						WHERE courses.del_flag = 0
+							AND course_details.course_id = courses.id
+							AND course_details.profile_id = profiles.id
+							AND course_details.del_flag = 0`
+	rows, err := db.Query(query)
+	if err != nil {
+		helper.WriteLog("/course_details.log", err.Error(), query)
+		c.JSON(500, gin.H{
+			"messages": "Course Details Not Found",
+		})
+	}
+	for rows.Next() {
+		var courseParticipants view.CourseParticipants
+
+		if err := rows.Scan(
+			&courseParticipants.ID,
+			&courseParticipants.Employee_Name,
+			&courseParticipants.Employee_Id,
+			&courseParticipants.Course_Name,
+			&courseParticipants.Course_Type,
+			&courseParticipants.Course_Id,
+			&courseParticipants.Profile_Id,
+			&courseParticipants.End_Date,
+			&courseParticipants.Weekdays,
+			&courseParticipants.Time,
+			&courseParticipants.Del_flag,
+			&courseParticipants.Updated_time,
+			&courseParticipants.Updated_user,
+			&courseParticipants.Created_time,
+			&courseParticipants.Created_user,
+		); err != nil {
+			helper.WriteLog("/course_details.log", err.Error(), query)
+			panic(err.Error())
+		}
+		allCourseParticipants = append(allCourseParticipants, courseParticipants)
+	}
+	if err = rows.Err(); err != nil {
+		panic(err.Error())
+	}
+	c.JSON(200, gin.H{
+		"message": "getAllCourseParticipants",
+		"result":  allCourseParticipants,
+	})
+}
+
 func GetCourseParticipants(c *gin.Context) {
 	db := database.DBConn()
 	var courseParticipants []view.CourseParticipants

@@ -23,13 +23,13 @@ func SetupRouter() *gin.Engine {
 	router.POST("/user/signup", repos.CreateUser)
 
 	// Authentication
-	auth := router.Group("/auth")
+	auth := router.Group("auth")
 	auth.Use(middleware.Authentication())
 	auth.PATCH("/user/changepassword/:id", repos.ChangePassword)
 	auth.Static("/user", "public/users")
 
 	// PROFILES API
-	profiles := auth.Group("/profiles")
+	profiles := auth.Group("profiles")
 	profiles.GET("/", repos.GetProfiles)
 	profiles.GET("/:id", repos.GetProfile)
 	profiles.POST("/create", repos.CreateProfile)
@@ -37,10 +37,11 @@ func SetupRouter() *gin.Engine {
 	profiles.PATCH("/delete/:id", repos.DeleteProfile)
 
 	// COURSE API
-	courses := auth.Group("/courses")
+	courses := auth.Group("courses")
 	courses.GET("/", repos.GetCourses)
 	courses.GET("/:id", repos.GetCourse)
 	courses.GET("/:id/participants", repos.GetCourseParticipants)
+	courses.GET("/participants", repos.GetAllCourseParticipants)
 	courses.POST("/create", repos.CreateCourse)
 	courses.PATCH("/update/:id", repos.UpdateCourse)
 	courses.PATCH("/delete/:id", repos.DeleteCourse)
@@ -60,6 +61,27 @@ func SetupRouter() *gin.Engine {
 	departments.POST("/create", repos.CreateDepartment)
 	departments.PATCH("/update/:id", repos.UpdateDepartment)
 	departments.PATCH("/delete/:id", repos.DeleteDepartment)
+
+	// LEAVE API
+	leave := auth.Group("leave")
+	leave.GET("/", repos.GetAllLeaveDetails)
+	leave.GET("/:employee_id", repos.GetLeaveDetails)
+	leave.POST("/create", repos.CreateLeaveDetails)
+	leave.PATCH("/update/:id", repos.UpdateLeaveDetails)
+	leave.PATCH("/delete/:id", repos.DeleteLeaveDetails)
+
+	leaveTypes := leave.Group("types")
+	leaveTypes.GET("/", repos.GetLeaveTypes)
+	leaveTypes.POST("/create", repos.CreateLeaveType)
+	leaveTypes.PATCH("/update/:id", repos.UpdateLeaveType)
+	leaveTypes.PATCH("/delete/:id", repos.DeleteLeaveType)
+
+	leaveReasons := leave.Group("reasons")
+	leaveReasons.GET("/", repos.GetLeaveReasons)
+	leaveReasons.POST("/create", repos.CreateLeaveReason)
+	leaveReasons.PATCH("/update/:id", repos.UpdateLeaveReason)
+	leaveReasons.PATCH("/delete/:id", repos.DeleteLeaveReason)
+
 	return router
 }
 
